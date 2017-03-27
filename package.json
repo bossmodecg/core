@@ -1,0 +1,47 @@
+{
+  "name": "bossmodecg",
+  "version": "0.0.1",
+  "description": "The core server runtime for BossmodeCG.",
+  "main": "dist",
+  "license": "MIT",
+  "dependencies": {
+    "ajv": "^4.11.5",
+    "babel-cli": "^6.24.0",
+    "babel-plugin-transform-async-to-generator": "^6.22.0",
+    "babel-preset-env": "^1.2.2",
+    "babel-preset-es2017": "^6.22.0",
+    "commander": "^2.9.0",
+    "eventemitter2": "^4.0.0",
+    "express": "^4.15.2",
+    "fs-promise": "^2.0.1",
+    "jsondiffpatch": "^0.2.4",
+    "lodash": "^4.17.4",
+    "moment": "^2.18.1",
+    "morgan": "^1.8.1",
+    "node-async-locks": "^1.0.1",
+    "socket.io": "^1.7.3",
+    "socket.io-client": "^1.7.3"
+  },
+  "devDependencies": {
+    "babel-eslint": "^7.2.1",
+    "babel-jest": "^19.0.0",
+    "eslint": "^3.18.0",
+    "eslint-config-airbnb": "latest",
+    "eslint-plugin-flowtype": "^2.30.4",
+    "eslint-plugin-import": "^2.2.0",
+    "eslint-plugin-jsx-a11y": "^3.0.2 || ^4.0.0",
+    "eslint-plugin-react": "^6.9.0",
+    "flow-bin": "^0.42.0",
+    "husky": "^0.13.2",
+    "jest": "^19.0.2",
+    "pryjs": "^1.0.3"
+  },
+  "scripts": {
+    "start": "babel-node src",
+    "console": "babel-node",
+    "test": "eslint src && flow && jest --coverage",
+    "build": "babel src -d dist",
+    "precommit": "yarn test",
+    "prepush": "yarn test"
+  }
+}
