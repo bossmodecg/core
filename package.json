@@ -1,6 +1,6 @@
 {
   "name": "@bossmodecg/core",
-  "version": "0.0.11",
+  "version": "0.0.20",
   "description": "The core server runtime for BossmodeCG.",
   "main": "dist",
   "license": "MIT",
@@ -8,6 +8,9 @@
     "url": "https://github.com/bossmodecg/core/issues"
   },
   "repository": "github:bossmodecg/core",
+  "files": [
+    "dist"
+  ],
   "dependencies": {
     "ajv": "^4.11.5",
     "commander": "^2.9.0",
@@ -36,6 +39,8 @@
     "eslint-plugin-flowtype": "^2.30.4",
     "eslint-plugin-import": "^2.2.0",
     "eslint-plugin-jsx-a11y": "^3.0.2 || ^4.0.0",
+    "eslint-plugin-react": "^6.9.0",
+    "flow-bin": "^0.42.0",
     "husky": "^0.13.2",
     "jest": "^19.0.2"
   },

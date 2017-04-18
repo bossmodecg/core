@@ -21,6 +21,7 @@ const DEFAULT_OPTIONS =
 
     },
     modules: [],
+    moduleMap: {},
     automaticPushdowns: []
   };
 
@@ -49,9 +50,9 @@ function loadBModuleConfig(basePath, bmName) {
   return JSON.parse(fs.readFileSync(configPath, 'utf8'));
 }
 
-function loadCustom(basePath, bmName) {
+function loadCustom(basePath, bmName, packageNameOverride) {
   // TODO: we should...make this...better.
-  const packageName = `bossmodecg-module-${bmName}`;
+  const packageName = packageNameOverride || `@bossmodecg/module-${bmName}`;
   const nodeModuleRoot = `${basePath}/node_modules/${packageName}`;
 
   try {
@@ -81,7 +82,7 @@ function loadCustom(basePath, bmName) {
   }
 }
 
-export function loadBModules(basePath, bModuleList) {
+export function loadBModules(basePath, bModuleList, serverMap) {
   const validatorGenerator = new Ajv();
 
   const ret = {};
@@ -89,7 +90,7 @@ export function loadBModules(basePath, bModuleList) {
   bModuleList.forEach((bModuleName) => {
     const bmName = bModuleName.toLowerCase();
 
-    const bModuleRequire = loadCustom(basePath, bmName);
+    const bModuleRequire = loadCustom(basePath, bmName, serverMap[bmName]);
     const bModuleConfig = loadBModuleConfig(basePath, bmName);
 
     const bModuleClass = bModuleRequire.default;

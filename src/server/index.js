@@ -50,7 +50,9 @@ export default class Server extends EventEmitter2 {
     this._app = buildHttpApp();
     this._httpServer = http.Server(this._app);
     this._io = buildSocketIO(this._httpServer);
-    this._bmodules = Object.freeze(loadBModules(this._path, this._options.modules));
+    this._bmodules = Object.freeze(
+      loadBModules(this._path, this._options.modules, this._options.moduleMap)
+    );
   }
 
   get io() { return this._io; }
