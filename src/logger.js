@@ -1,8 +1,10 @@
 import moment from 'moment';
 
+import { messagify } from './util';
+
 export class Logger {
   constructor(category) {
-    this._category = (category || _category || "unspecified").toLowerCase();
+    this._category = (category || "unspecified").toLowerCase();
 
     this.error = this.error.bind(this);
     this.showError = true;
@@ -17,33 +19,32 @@ export class Logger {
   }
 
   error(msg) {
-    this.showError && console.log(`E ${moment().toISOString()} [${this._category}] ${this._handleMessage(msg)}`);
+    if (this.showError) {
+      console.log(`E ${moment().toISOString()} [${this._category}] ${messagify(msg)}`);
+    }
   }
 
   warn(msg) {
-    this.showWarn && console.log(`W ${moment().toISOString()} [${this._category}] ${this._handleMessage(msg)}`);
+    if (this.showWarn) {
+      console.log(`W ${moment().toISOString()} [${this._category}] ${messagify(msg)}`);
+    }
   }
 
   info(msg) {
-    this.showInfo && console.log(`I ${moment().toISOString()} [${this._category}] ${this._handleMessage(msg)}`);
+    if (this.showInfo) {
+      console.log(`I ${moment().toISOString()} [${this._category}] ${messagify(msg)}`);
+    }
   }
 
   debug(msg) {
-    this.showDebug && console.log(`D ${moment().toISOString()} [${this._category}] ${this._handleMessage(msg)}`);
+    if (this.showDebug) {
+      console.log(`D ${moment().toISOString()} [${this._category}] ${messagify(msg)}`);
+    }
   }
 
   trace(msg) {
-    this.showTrace && console.log(`T ${moment().toISOString()} [${this._category}] ${this._handleMessage(msg)}`);
-  }
-
-  _handleMessage(msg) {
-    switch(typeof(msg)) {
-      case 'function':
-        return msg();
-      case 'object':
-        return JSON.stringify(msg);
-      default:
-        return msg;
+    if (this.showTrace) {
+      console.log(`T ${moment().toISOString()} [${this._category}] ${messagify(msg)}`);
     }
   }
 }

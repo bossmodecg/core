@@ -1,16 +1,22 @@
+import commander from 'commander';
+import fs from 'fs';
+
 import Server from './server';
 import { Logger } from './logger';
 
-import commander from 'commander';
-import fs from 'fs';
-import pry from 'pryjs';
+const npmInfo = require('../package.json');
 
 const logger = new Logger("cli");
-const npmInfo = require('../package.json');
+
+function _buildCommandParser() {
+  return commander
+    .version(npmInfo.version)
+    .usage("[path]");
+}
 
 export default class CLI {
   constructor(args = []) {
-    if (typeof(window) !== 'undefined') {
+    if (typeof window !== 'undefined') {
       throw new Error("This can only be instantiated in a NodeJS environment.");
     }
 
@@ -22,18 +28,12 @@ export default class CLI {
   async run() {
     logger.info("Instancing CLI application.");
 
-    const commandParser = this._buildCommandParser();
+    const commandParser = _buildCommandParser();
     commandParser.parse(this._args);
 
     const workingDirectory = fs.realpathSync(commandParser.args[0] || ".");
 
     const server = new Server(workingDirectory);
     await server.run();
-  }
-
-  _buildCommandParser() {
-    return commander
-      .version(npmInfo.version)
-      .usage("[path]");
   }
 }

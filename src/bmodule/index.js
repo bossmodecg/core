@@ -1,8 +1,8 @@
-import { EventEmitter2 } from 'eventemitter2';
-import { ModuleLogger } from '../logger';
-
-import NodeAsyncLocks from 'node-async-locks';
 import _ from 'lodash';
+import { EventEmitter2 } from 'eventemitter2';
+import NodeAsyncLocks from 'node-async-locks';
+
+import { ModuleLogger } from '../logger';
 
 const jsondiffpatch = require('jsondiffpatch').create({});
 
@@ -67,10 +67,10 @@ export default class BModule extends EventEmitter2 {
    */
   async setState(stateDelta) {
     // TODO: we should figure out a way to delete keys. Setting to null is suboptimal.
-    const newState =
+    const updatedState =
       await NodeAsyncLocks.lockPromise(`${this.name}-state`, async () => {
         const oldState = this._state;
-        const newState = _.merge({}, newState, this._state, stateDelta);
+        const newState = _.merge({}, this._state, stateDelta);
 
         this._state = newState;
 
@@ -79,22 +79,24 @@ export default class BModule extends EventEmitter2 {
         }
 
         const delta = jsondiffpatch.diff(oldState, newState);
-        const deltaEvent = { bmName: this.name, delta: delta };
+        const deltaEvent = { bmName: this.name, delta };
 
-        this.emit("stateChanged", { state: newState, delta: delta });
+        this.emit("stateChanged", { state: newState, delta });
         this.server.pushEvent("stateDelta", deltaEvent);
 
         return this._state;
       });
 
-    return newState;
+    return updatedState;
   }
 
   pushEvent(eventName, event) {
     this.server.pushEvent(`${this.name}.${eventName}`, event);
   }
 
+  /* eslint-disable class-methods-use-this, no-unused-vars */
   async _doRegister(server) {
     throw new Error("BModule implementations must override _doRegister().");
   }
+  /* eslint-enable class-methods-use-this, no-unused-vars */
 }

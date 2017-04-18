@@ -1,6 +1,6 @@
 {
   "name": "@bossmodecg/core",
-  "version": "0.0.1",
+  "version": "0.0.10",
   "description": "The core server runtime for BossmodeCG.",
   "main": "dist",
   "license": "MIT",
@@ -10,12 +10,6 @@
   "repository": "github:bossmodecg/core",
   "dependencies": {
     "ajv": "^4.11.5",
-    "babel-cli": "^6.24.0",
-    "babel-plugin-transform-async-to-generator": "^6.22.0",
-    "babel-plugin-transform-class-properties": "^6.23.0",
-    "babel-plugin-transform-runtime": "^6.23.0",
-    "babel-preset-env": "^1.2.2",
-    "babel-preset-es2017": "^6.22.0",
     "commander": "^2.9.0",
     "eventemitter2": "^4.0.0",
     "express": "^4.15.2",
@@ -29,6 +23,12 @@
     "socket.io-client": "^1.7.3"
   },
   "devDependencies": {
+    "babel-cli": "^6.24.0",
+    "babel-preset-env": "^1.2.2",
+    "babel-preset-es2017": "^6.22.0",
+    "babel-plugin-transform-async-to-generator": "^6.22.0",
+    "babel-plugin-transform-class-properties": "^6.23.0",
+    "babel-plugin-transform-runtime": "^6.23.0",
     "babel-eslint": "^7.2.1",
     "babel-jest": "^19.0.0",
     "eslint": "^3.18.0",
@@ -39,15 +39,15 @@
     "eslint-plugin-react": "^6.9.0",
     "flow-bin": "^0.42.0",
     "husky": "^0.13.2",
-    "jest": "^19.0.2",
-    "pryjs": "^1.0.3"
+    "jest": "^19.0.2"
   },
   "scripts": {
-    "start": "babel-node src",
+    "start": "babel-node",
     "console": "babel-node",
-    "test": "eslint src && flow && jest --coverage",
+    "test": "eslint src && jest --coverage",
     "build": "babel src -d dist",
-    "precommit": "yarn test",
-    "prepush": "yarn test"
+    "prepublish": "npm run build",
+    "precommit": "npm run test",
+    "prepush": "npm run test"
   }
 }

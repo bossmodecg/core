@@ -4,9 +4,9 @@ import Server from './server';
 import defaultLogger, { Logger } from './logger';
 
 const BossmodeCG = {
-  BModule: BModule,
-  Server: Server,
-  Logger: Logger,
+  BModule,
+  Server,
+  Logger,
   logger: defaultLogger
 };
 

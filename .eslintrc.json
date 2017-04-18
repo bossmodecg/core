@@ -1,14 +1,21 @@
 {
   "extends": [
-    "airbnb",
-    "plugin:flowtype/recommended"
+    "airbnb"
   ],
 
   "plugins": [
-    "flowtype"
   ],
 
   "env": {
     "jest": true
+  },
+
+  "rules": {
+    "arrow-parens": [ "error", "always" ],
+    "comma-dangle": [ "error", "never" ],
+    "max-len": [ "warn", 120 ],
+    "no-console": "off",
+    "no-underscore-dangle": "off",
+    "quotes": "off"
   }
 }

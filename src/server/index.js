@@ -1,11 +1,10 @@
-import { Logger } from '../logger';
-
-import { EventEmitter2 } from 'eventemitter2';
-
 import http from 'http';
 import fs from 'fs';
 import fsp from 'fs-promise';
-import _ from 'lodash';
+
+import { EventEmitter2 } from 'eventemitter2';
+
+import { Logger } from '../logger';
 
 import {
   loadOptions,
@@ -21,9 +20,9 @@ export default class Server extends EventEmitter2 {
   constructor(path) {
     super({ wildcard: true, newListener: false });
 
-    process.on('unhandledRejection', r => {
+    process.on('unhandledRejection', (r) => {
       logger.error("!!! unhandled promise rejection !!!");
-      console.log(r)
+      console.log(r);
     });
 
     this._configureSocketIO = this._configureSocketIO.bind(this);
@@ -65,7 +64,7 @@ export default class Server extends EventEmitter2 {
 
       bmodule.onAny((eventName, event) => {
         if (!eventName.startsWith("internal.")) {
-          this.emit(`${bmodule.name}.${eventName}`);
+          this.emit(`${bmodule.name}.${eventName}`, event);
         }
       });
     }));
@@ -83,31 +82,34 @@ export default class Server extends EventEmitter2 {
     const bmodule = this._bmodules[bmName];
 
     if (!bmodule) {
-      logger.error(`Attempted to set remote state for '${bmName}', but that module doesn't exist?`);
+      const err = `Attempted to set remote state for '${bmName}', but that module doesn't exist?`;
+      logger.error(err);
+
+      throw new Error(err);
+    } else if (bmodule.moduleOptions.internalStateUpdatesOnly) {
+      logger.warn(`Attempted to set remote state for '${bmName}', but that module disallows external state changes.`);
+
+      return null;
     } else {
-      if (bmodule.moduleOptions.internalStateUpdatesOnly) {
-        logger.warn(`Attempted to set remote state for '${bmName}', but that module disallows external state changes.`);
-      } else {
-        return await bmodule.setState(stateDelta);
-      }
+      return bmodule.setState(stateDelta);
     }
   }
 
   async readModuleCache(bmName) {
     const cachePath = this._moduleCachePath(bmName);
-    logger.debug(`Loading cache for '${bmName}' from '${cachePath}'.`)
+    logger.debug(`Loading cache for '${bmName}' from '${cachePath}'.`);
 
     if (await fsp.exists(cachePath)) {
       logger.trace(`Cache loaded for '${bmName}'.`);
       return JSON.parse(await fsp.readFile(cachePath));
-    } else {
-      logger.trace(`No cache found for '${bmName}'.`);
-      return {};
     }
+
+    logger.trace(`No cache found for '${bmName}'.`);
+    return {};
   }
 
   async writeModuleCache(bmName, moduleState) {
-    if (typeof(moduleState) !== 'object') {
+    if (typeof moduleState !== 'object') {
       logger.warn(`Module '${bmName}' attempted to save a non-object cache. Probably a bug.`);
     } else {
       const cachePath = this._moduleCachePath(bmName);
@@ -131,16 +133,18 @@ export default class Server extends EventEmitter2 {
       if (client.identity) {
         client.emit(eventName, event);
       }
-    })
+    });
   }
 
   _configureSocketIO() {
     this._io.on('connection', (client) => {
+      /* eslint-disable no-param-reassign */
       client.error = (msg) => clientLogger.error(`Client '${client.id}': ${msg}`);
       client.warn = (msg) => clientLogger.warn(`Client '${client.id}': ${msg}`);
       client.info = (msg) => clientLogger.info(`Client '${client.id}': ${msg}`);
       client.debug = (msg) => clientLogger.debug(`Client '${client.id}': ${msg}`);
       client.trace = (msg) => clientLogger.trace(`Client '${client.id}': ${msg}`);
+      /* eslint-enable no-param-reassign */
 
       client.info("Connected. Waiting for identify.");
 
@@ -149,20 +153,20 @@ export default class Server extends EventEmitter2 {
         if (client.identity) {
           client.warn("Attempted to re-identify after identify.");
           client.emit('clientError', { message: "can't re-identify; disconnect and reconnect (refresh)." });
+        } else if (!this._validateClientIdentity(client, identifyEvent)) {
+          client.warn("Failed authentication.");
+          client.emit('clientError', { message: "authentication failed." });
         } else {
-          if (!this._validateClientIdentity(client, identifyEvent)) {
-            client.warn("Failed authentication.");
-            client.emit('clientError', { message: "authentication failed." });
-          } else {
-            client.info("Authentication succeeded.");
-            client.identity = { identifier: identifyEvent.identifier, clientType: identifyEvent.clientType };
-            this._attachIdentifiedClientEvents(client);
-            client.emit('authenticationSucceeded');
+          client.info("Authentication succeeded.");
 
-            // TODO: remove the identify listener here
-            // client.removeListener('identify', this._identifyClient);
-            this.emit("internal.clientAuthenticated", client);
-          }
+          // eslint-disable-next-line no-param-reassign
+          client.identity = { identifier: identifyEvent.identifier, clientType: identifyEvent.clientType };
+          this._attachIdentifiedClientEvents(client);
+          client.emit('authenticationSucceeded');
+
+          // TODO: remove the identify listener here
+          // client.removeListener('identify', this._identifyClient);
+          this.emit("internal.clientAuthenticated", client);
         }
       });
 
@@ -268,13 +272,17 @@ export default class Server extends EventEmitter2 {
     }
 
     client.warn(`Unrecognized client type '${clientType}'.`);
-    client.emit('clientError', { message: `unrecognized client type '${clientType}'.`});
+    client.emit('clientError', { message: `unrecognized client type '${clientType}'.` });
     return false;
   }
 
   _emitFullStateForClient(client) {
     const fullState = {};
-    Object.keys(this._bmodules).forEach((bmName) => fullState[bmName] = this._bmodules[bmName].safeState);
+    Object.keys(this._bmodules).forEach((bmName) => {
+      fullState[bmName] = this._bmodules[bmName].safeState;
+
+      return fullState[bmName];
+    });
 
     client.emit('state', fullState);
   }
