@@ -3,5 +3,14 @@
     "env",
     "es2017"
   ],
-  "plugins": ["transform-async-to-generator"]
+  "plugins": [
+    "transform-async-to-generator",
+    "transform-class-properties",
+    [
+      "transform-runtime", {
+      "polyfill": false,
+      "regenerator": true
+      }
+    ]
+  ]
 }

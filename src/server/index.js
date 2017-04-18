@@ -21,6 +21,11 @@ export default class Server extends EventEmitter2 {
   constructor(path) {
     super({ wildcard: true, newListener: false });
 
+    process.on('unhandledRejection', r => {
+      logger.error("!!! unhandled promise rejection !!!");
+      console.log(r)
+    });
+
     this._configureSocketIO = this._configureSocketIO.bind(this);
     this._postModuleRegistration = this._postModuleRegistration.bind(this);
     this._emitFullStateForClient = this._emitFullStateForClient.bind(this);
@@ -57,6 +62,12 @@ export default class Server extends EventEmitter2 {
 
     await Promise.all(Object.values(this._bmodules).map(async (bmodule) => {
       await bmodule.register(this);
+
+      bmodule.onAny((eventName, event) => {
+        if (!eventName.startsWith("internal.")) {
+          this.emit(`${bmodule.name}.${eventName}`);
+        }
+      });
     }));
 
     this._postModuleRegistration();
@@ -115,7 +126,7 @@ export default class Server extends EventEmitter2 {
    * @param {*} eventName The name of the event.
    * @param {*} event Arbitrary JSON for an event.
    */
-  async pushEvent(eventName, event = {}) {
+  pushEvent(eventName, event = {}) {
     Object.values(this._io.sockets.connected).forEach((client) => {
       if (client.identity) {
         client.emit(eventName, event);
@@ -125,25 +136,25 @@ export default class Server extends EventEmitter2 {
 
   _configureSocketIO() {
     this._io.on('connection', (client) => {
-      client.error_log = (msg) => clientLogger.error(`Client '${client.id}': ${msg}`);
-      client.warn_log = (msg) => clientLogger.warn(`Client '${client.id}': ${msg}`);
-      client.info_log = (msg) => clientLogger.info(`Client '${client.id}': ${msg}`);
-      client.debug_log = (msg) => clientLogger.debug(`Client '${client.id}': ${msg}`);
-      client.trace_log = (msg) => clientLogger.trace(`Client '${client.id}': ${msg}`);
+      client.error = (msg) => clientLogger.error(`Client '${client.id}': ${msg}`);
+      client.warn = (msg) => clientLogger.warn(`Client '${client.id}': ${msg}`);
+      client.info = (msg) => clientLogger.info(`Client '${client.id}': ${msg}`);
+      client.debug = (msg) => clientLogger.debug(`Client '${client.id}': ${msg}`);
+      client.trace = (msg) => clientLogger.trace(`Client '${client.id}': ${msg}`);
 
-      client.info_log("Connected. Waiting for identify.");
+      client.info("Connected. Waiting for identify.");
 
       client.on('identify', (identifyEvent) => {
         // It shouldn't be possible to hit this because we unsubscribe from identify, but to be safe...
         if (client.identity) {
-          client.warn_log("Attempted to re-identify after identify.");
+          client.warn("Attempted to re-identify after identify.");
           client.emit('clientError', { message: "can't re-identify; disconnect and reconnect (refresh)." });
         } else {
           if (!this._validateClientIdentity(client, identifyEvent)) {
-            client.warn_log("Failed authentication.");
+            client.warn("Failed authentication.");
             client.emit('clientError', { message: "authentication failed." });
           } else {
-            client.info_log("Authentication succeeded.");
+            client.info("Authentication succeeded.");
             client.identity = { identifier: identifyEvent.identifier, clientType: identifyEvent.clientType };
             this._attachIdentifiedClientEvents(client);
             client.emit('authenticationSucceeded');
@@ -156,7 +167,7 @@ export default class Server extends EventEmitter2 {
       });
 
       client.on('disconnect', (reason) => {
-        client.info_log(`Disconnected (${reason}).`);
+        client.info(`Disconnected (${reason}).`);
 
         this.emit("internal.clientDisconnected", client);
       });
@@ -174,7 +185,7 @@ export default class Server extends EventEmitter2 {
       // so here's how we do that.
       const automaticPushdowns = ((this._options || {}).automaticPushdowns || []);
       if (!eventName.startsWith("internal.") && automaticPushdowns.some((regex) => regex.test(eventName))) {
-        logger.trace(`Automatic pushdown: ${eventName}`);
+        logger.debug(`Automatic pushdown: ${eventName}`);
         this.pushEvent(eventName, event);
       }
     });
@@ -188,31 +199,60 @@ export default class Server extends EventEmitter2 {
     client.on('getFullState', () => {
       this._emitFullStateForSocket(client);
     });
+
+    if (client.identity.clientType === 'management') {
+      client.on('pushupEvent', (pushupEvent) => {
+        const bmName = pushupEvent.bmName;
+        const eventName = pushupEvent.eventName;
+        const event = pushupEvent.event;
+
+        const mod = this._bmodules[bmName];
+
+        if (!mod) {
+          client.warn(`Received client message from '${bmName}' but no module found.`);
+        } else {
+          const whitelist = mod._moduleOptions.managementEventWhitelist;
+
+          if (!whitelist || whitelist.some((regex) => regex.test(eventName))) {
+            client.debug(`Pushing '${eventName}' to module '${bmName}'.`);
+            mod.emit(eventName, event);
+          }
+        }
+      });
+
+      client.on('stateDelta', (stateDeltaEvent) => {
+        const bmName = stateDeltaEvent.bmName;
+        const delta = stateDeltaEvent.delta;
+
+        client.debug(`Received stateDelta for module '${bmName}'.`);
+        this.setRemoteModuleState(bmName, delta);
+      });
+    }
   }
 
   _validateClientIdentity(client, identifyEvent) {
     const clientType = identifyEvent.clientType;
 
     if (clientType === 'frontend') {
-      client.trace_log("Is a frontend client.");
+      client.trace("Is a frontend client.");
       const frontendAuth = this._options.frontendAuth;
 
       if (!frontendAuth) {
-        client.trace_log("No frontendAuth config defined; assuming open auth.");
+        client.trace("No frontendAuth config defined; assuming open auth.");
         return true;
       }
 
       const passphrase = frontendAuth[identifyEvent.identifier];
       if (!passphrase) {
-        client.trace_log("No passphrase provided.");
+        client.trace("No passphrase provided.");
         return false;
       }
 
       const passphraseMatches = passphrase === identifyEvent.passphrase;
       if (passphraseMatches) {
-        client.trace_log("Passphrase matches.");
+        client.trace("Passphrase matches.");
       } else {
-        client.trace_log("Passphrase does not match.");
+        client.trace("Passphrase does not match.");
       }
 
       return passphraseMatches;
@@ -233,8 +273,9 @@ export default class Server extends EventEmitter2 {
   }
 
   _emitFullStateForClient(client) {
-    Object.keys(this._bmodules).forEach((bmName) => {
-      client.emit('state', { bmName: bmName, state: this._bmodules[bmName].safeState });
-    });
+    const fullState = {};
+    Object.keys(this._bmodules).forEach((bmName) => fullState[bmName] = this._bmodules[bmName].safeState);
+
+    client.emit('state', fullState);
   }
 }

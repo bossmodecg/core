@@ -1,13 +1,19 @@
 {
-  "name": "bossmodecg",
+  "name": "@bossmodecg/core",
   "version": "0.0.1",
   "description": "The core server runtime for BossmodeCG.",
   "main": "dist",
   "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/bossmodecg/core/issues"
+  },
+  "repository": "github:bossmodecg/core",
   "dependencies": {
     "ajv": "^4.11.5",
     "babel-cli": "^6.24.0",
     "babel-plugin-transform-async-to-generator": "^6.22.0",
+    "babel-plugin-transform-class-properties": "^6.23.0",
+    "babel-plugin-transform-runtime": "^6.23.0",
     "babel-preset-env": "^1.2.2",
     "babel-preset-es2017": "^6.22.0",
     "commander": "^2.9.0",

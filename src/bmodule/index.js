@@ -1,3 +1,4 @@
+import { EventEmitter2 } from 'eventemitter2';
 import { ModuleLogger } from '../logger';
 
 import NodeAsyncLocks from 'node-async-locks';
@@ -9,21 +10,26 @@ const DEFAULT_MODULE_OPTIONS =
   Object.freeze(
     {
       internalStateUpdatesOnly: false,
+      managementEventWhitelist: null,
       shouldCacheState: true,
       readCacheCallback: (cacheState) => cacheState
     }
   );
 
-export default class BModule {
+export default class BModule extends EventEmitter2 {
   constructor(name, config, moduleOptions) {
+    super({ wildcard: true, newListener: false });
+
     this.register = this.register.bind(this);
     this._doRegister = this._doRegister.bind(this);
+    this.emit = this.emit.bind(this);
+    this.emitAsync = this.emitAsync.bind(this);
+    this.on = this.on.bind(this);
 
     this._name = name.toLowerCase();
     this._config = config;
     this._logger = new ModuleLogger(name);
-    this._moduleOptions = {};
-    _.merge(this._moduleOptions, DEFAULT_MODULE_OPTIONS, moduleOptions);
+    this._moduleOptions = Object.freeze(_.merge({}, DEFAULT_MODULE_OPTIONS, moduleOptions));
 
     this._state = {};
   }
@@ -34,6 +40,7 @@ export default class BModule {
   get server() { return this._server; }
   get moduleOptions() { return this._moduleOptions; }
 
+  get state() { return this._state; }
   get safeState() { return _.cloneDeep(this._state); }
 
   async register(server) {
@@ -83,52 +90,7 @@ export default class BModule {
     return newState;
   }
 
-  /**
-   * Emits an event on the server bus (NOT this module itself). Prepends the name of the
-   * event provided to this method as a namespace, i.e. module 'example' will emit its
-   * 'exampleEvent' and listeners should key on 'example.exampleEvent'.
-   *
-   * If you need to emit an event that does not conform to your namespace, call `this.server.emit`
-   * manually.
-   *
-   * @param {string} eventName The name of the event (which will be namespaced for this module).
-   * @param {*} a0 arbitrary parameter for the callback
-   * @param {*} a1 arbitrary parameter for the callback
-   * @param {*} a2 arbitrary parameter for the callback
-   * @param {*} a3 arbitrary parameter for the callback
-   * @param {*} a4 arbitrary parameter for the callback
-   * @param {*} a5 arbitrary parameter for the callback
-   * @param {*} a6 arbitrary parameter for the callback
-   * @param {*} a7 arbitrary parameter for the callback
-   */
-  async emit(eventName, a0, a1, a2, a3, a4, a5, a6, a7) {
-    this.server.emit(`${this.name}.${eventName}`, a0, a1, a2, a3, a4, a5, a6, a7);
-  }
-
-  /**
-   * Emits an event on the server bus (NOT this module itself). Prepends the name of the
-   * event provided to this method as a namespace, i.e. module 'example' will emit its
-   * 'exampleEvent' and listeners should key on 'example.exampleEvent'. Unlike emit(),
-   * emitAsync() returns a promise that will return the results of all listeners.
-   *
-   * If you need to emit an event that does not conform to your namespace, call
-   * `this.server.emitAsync` manually.
-   *
-   * @param {string} eventName The name of the event (which will be namespaced for this module).
-   * @param {*} a0 arbitrary parameter for the callback
-   * @param {*} a1 arbitrary parameter for the callback
-   * @param {*} a2 arbitrary parameter for the callback
-   * @param {*} a3 arbitrary parameter for the callback
-   * @param {*} a4 arbitrary parameter for the callback
-   * @param {*} a5 arbitrary parameter for the callback
-   * @param {*} a6 arbitrary parameter for the callback
-   * @param {*} a7 arbitrary parameter for the callback
-   */
-  async emitAsync(eventName, a0, a1, a2, a3, a4, a5, a6, a7) {
-    return this.server.emitAsync(`${this.name}.${eventName}`, a0, a1, a2, a3, a4, a5, a6, a7);
-  }
-
-  async pushEvent(eventName, event) {
+  pushEvent(eventName, event) {
     this.server.pushEvent(`${this.name}.${eventName}`, event);
   }
 

@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import socketio from 'socket.io';
 
 import fs from 'fs';
+import path from 'path';
 import _ from 'lodash';
 import Ajv from 'ajv';
 
@@ -70,24 +71,42 @@ export function loadBModules(path, bModuleList) {
       }
     }
 
-    ret[bmName] = new bModuleClass(bModuleConfig);
+    const mod = new bModuleClass(bModuleConfig);
+
+    ret[mod.name] = mod;
   });
 
   return ret;
 }
 
 function loadCustom(path, bmName) {
+  // TODO: we should...make this...better.
   const packageName = `bossmodecg-module-${bmName}`;
-  const nodeModulePath = `${path}/node_modules/${packageName}/dist/bmodule`;
+  const nodeModuleRoot = `${path}/node_modules/${packageName}`;
 
   try {
     logger.info(`Loading bmodule '${bmName}' (node package ${packageName}).`);
-    logger.debug(`Requiring '${bmName}' class from ${nodeModulePath}.`);
-    return require(nodeModulePath);
-  } catch (e) {
-    logger.error(`Failure when loading bmodule '${bmName}': ${e.message}`)
 
-    throw e;
+    const packageJsonPath = `${nodeModuleRoot}/package.json`;
+
+    if (!fs.existsSync(packageJsonPath)) {
+      throw new Error(`No package.json file found at: ${packageJsonPath}`);
+    }
+
+    const packageInfo = JSON.parse(fs.readFileSync(packageJsonPath));
+    const packageBMInfo = packageInfo.bossmodecg;
+
+    const requireRelPath = (packageBMInfo && packageBMInfo.modulePath) ||
+                            packageInfo.main || "index";
+
+    const requireTarget = `${nodeModuleRoot}/${requireRelPath}`;
+
+    logger.debug(`Requiring '${bmName}' module from ${requireTarget}.`);
+    return require(requireTarget);
+  } catch (err) {
+    logger.error(`Error loading '${bmName}': ${err.message}`);
+
+    throw err;
   }
 }
 
