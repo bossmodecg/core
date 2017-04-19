@@ -43,14 +43,14 @@ export default class BModule extends EventEmitter2 {
   get state() { return this._state; }
   get safeState() { return _.cloneDeep(this._state); }
 
-  async register(server) {
+  async register(server, http) {
     this._server = server;
 
     if (this._moduleOptions.shouldCacheState) {
       this._state = this._moduleOptions.readCacheCallback(await this.server.readModuleCache(this._name));
     }
 
-    await this._doRegister(server);
+    await this._doRegister(server, http);
   }
 
   /**

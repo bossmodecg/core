@@ -12,6 +12,13 @@ import { Logger } from '../logger';
 
 const logger = new Logger("server");
 
+export const bossmodeCGHeaders =
+  Object.freeze({
+    clientType: "X-BossmodeCG-ClientType",
+    identifier: "X-BossmodeCG-Identifier",
+    passphrase: "X-BossmodeCG-Passphrase"
+  });
+
 const DEFAULT_OPTIONS =
   {
     http: {
@@ -118,6 +125,14 @@ export function buildHttpApp() {
   const app = express();
 
   app.use(morgan('combined'));
+
+  app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, " +
+                `${bossmodeCGHeaders.clientType}, ${bossmodeCGHeaders.identifier}, ` +
+                `${bossmodeCGHeaders.passphrase}`);
+    next();
+  });
 
   logger.debug("Specifying GET /health-check");
   app.get('/health-check',

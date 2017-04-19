@@ -5,6 +5,7 @@ import fsp from 'fs-promise';
 import { EventEmitter2 } from 'eventemitter2';
 
 import { Logger } from '../logger';
+import HttpWrapper from './http_wrapper';
 
 import {
   loadOptions,
@@ -15,6 +16,7 @@ import {
 
 const logger = new Logger("server");
 const clientLogger = new Logger("client");
+const authLogger = new Logger("auth");
 
 export default class Server extends EventEmitter2 {
   constructor(path) {
@@ -29,6 +31,7 @@ export default class Server extends EventEmitter2 {
     this._postModuleRegistration = this._postModuleRegistration.bind(this);
     this._emitFullStateForClient = this._emitFullStateForClient.bind(this);
     this._attachIdentifiedClientEvents = this._attachIdentifiedClientEvents.bind(this);
+    this._validateClient = this._validateClient.bind(this);
     this._validateClientIdentity = this._validateClientIdentity.bind(this);
     this._moduleCachePath = this._moduleCachePath.bind(this);
     this.readModuleCache = this.readModuleCache.bind(this);
@@ -47,9 +50,6 @@ export default class Server extends EventEmitter2 {
     }
 
     this._options = loadOptions(`${this._path}/config/server.json`);
-    this._app = buildHttpApp();
-    this._httpServer = http.Server(this._app);
-    this._io = buildSocketIO(this._httpServer);
     this._bmodules = Object.freeze(
       loadBModules(this._path, this._options.modules, this._options.moduleMap)
     );
@@ -59,10 +59,12 @@ export default class Server extends EventEmitter2 {
   get path() { return this._path; }
 
   async run() {
+    this._app = buildHttpApp();
     logger.info("Registering all bmodules with the server.");
 
     await Promise.all(Object.values(this._bmodules).map(async (bmodule) => {
-      await bmodule.register(this);
+      const wrapper = new HttpWrapper(bmodule.name, this._app, this);
+      await bmodule.register(this, wrapper);
 
       bmodule.onAny((eventName, event) => {
         if (!eventName.startsWith("internal.")) {
@@ -72,6 +74,10 @@ export default class Server extends EventEmitter2 {
     }));
 
     this._postModuleRegistration();
+
+    logger.info("Instantiating HTTP server.");
+    this._httpServer = http.Server(this._app);
+    this._io = buildSocketIO(this._httpServer);
     this._configureSocketIO();
 
     this.emit("internal.beforeRun", this);
@@ -236,29 +242,35 @@ export default class Server extends EventEmitter2 {
     }
   }
 
-  _validateClientIdentity(client, identifyEvent) {
-    const clientType = identifyEvent.clientType;
+  _validateClient(clientType, identifier, passphrase, rejectFrontendClients = false) {
+    const trace = (msg) => authLogger.trace(`${identifier}: ${msg}`);
+    const warn = (msg) => authLogger.warn(`${identifier}: ${msg}`);
 
     if (clientType === 'frontend') {
-      client.trace("Is a frontend client.");
-      const frontendAuth = this._options.frontendAuth;
-
-      if (!frontendAuth) {
-        client.trace("No frontendAuth config defined; assuming open auth.");
-        return true;
-      }
-
-      const passphrase = frontendAuth[identifyEvent.identifier];
-      if (!passphrase) {
-        client.trace("No passphrase provided.");
+      trace("Is a frontend client.");
+      if (rejectFrontendClients) {
+        trace("Directed to reject frontend clients, so rejecting.");
         return false;
       }
 
-      const passphraseMatches = passphrase === identifyEvent.passphrase;
+      const frontendAuth = this._options.frontendAuth;
+
+      if (!frontendAuth) {
+        trace("No frontendAuth config defined; assuming open auth.");
+        return true;
+      }
+
+      const correctPassphrase = frontendAuth[identifier];
+      if (!passphrase) {
+        trace("No passphrase provided.");
+        return false;
+      }
+
+      const passphraseMatches = passphrase === correctPassphrase;
       if (passphraseMatches) {
-        client.trace("Passphrase matches.");
+        trace("Passphrase matches.");
       } else {
-        client.trace("Passphrase does not match.");
+        trace("Passphrase does not match.");
       }
 
       return passphraseMatches;
@@ -267,15 +279,26 @@ export default class Server extends EventEmitter2 {
 
       if (!managementAuth) { return true; }
 
-      const passphrase = managementAuth[identifyEvent.identifier];
+      const correctPassphrase = managementAuth[identifier];
+      const passphraseMatches = passphrase === correctPassphrase;
       if (!passphrase) { return false; }
 
-      return passphrase === identifyEvent.passphrase;
+      if (passphraseMatches) {
+        trace("Passphrase matches.");
+      } else {
+        trace("Passphrase does not match.");
+      }
+
+      return passphraseMatches;
     }
 
-    client.warn(`Unrecognized client type '${clientType}'.`);
-    client.emit('clientError', { message: `unrecognized client type '${clientType}'.` });
+    warn(`Unrecognized client type '${clientType}'.`);
     return false;
+  }
+
+  _validateClientIdentity(client, identifyEvent) {
+    return this._validateClient(identifyEvent.clientType,
+      identifyEvent.identifier, identifyEvent.passphrase);
   }
 
   _emitFullStateForClient(client) {
