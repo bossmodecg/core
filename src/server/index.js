@@ -1,5 +1,8 @@
+import _ from 'lodash';
+
+import path from 'path';
 import http from 'http';
-import fs from 'fs';
+import fs from 'fs-extra';
 import fsp from 'fs-promise';
 
 import { EventEmitter2 } from 'eventemitter2';
@@ -7,9 +10,9 @@ import { EventEmitter2 } from 'eventemitter2';
 import { Logger } from '../logger';
 import HttpWrapper from './http_wrapper';
 
+import defaultConfig from './default_config';
+
 import {
-  loadOptions,
-  loadBModules,
   buildHttpApp,
   buildSocketIO
 } from './helpers';
@@ -19,8 +22,12 @@ const clientLogger = new Logger("client");
 const authLogger = new Logger("auth");
 
 export default class Server extends EventEmitter2 {
-  constructor(path) {
+  constructor(config, bmodules) {
     super({ wildcard: true, newListener: false });
+
+    if (typeof window !== 'undefined') {
+      throw new Error("BossmodeCG Server cannot run in a browser context.");
+    }
 
     process.on('unhandledRejection', (r) => {
       logger.error("!!! unhandled promise rejection !!!");
@@ -33,36 +40,34 @@ export default class Server extends EventEmitter2 {
     this._attachIdentifiedClientEvents = this._attachIdentifiedClientEvents.bind(this);
     this._validateClient = this._validateClient.bind(this);
     this._validateClientIdentity = this._validateClientIdentity.bind(this);
-    this._moduleCachePath = this._moduleCachePath.bind(this);
+
     this.readModuleCache = this.readModuleCache.bind(this);
     this.writeModuleCache = this.writeModuleCache.bind(this);
+    this.moduleStorePath = this.moduleStorePath.bind(this);
+
     this.pushEvent = this.pushEvent.bind(this);
 
-    this._path = path;
+    this._config = Object.freeze(_.merge({}, defaultConfig, config));
+    this._bmodules = _.mapKeys(bmodules, (bmodule) => bmodule.name);
 
-    if (!fs.existsSync(this._path)) {
-      throw new Error(`${path} does not exist.`);
-    }
-
-    const pathStat = fs.lstatSync(this._path);
-    if (!pathStat.isDirectory()) {
-      throw new Error(`${path} is not a directory.`);
-    }
-
-    this._options = loadOptions(`${this._path}/config/server.json`);
-    this._bmodules = Object.freeze(
-      loadBModules(this._path, this._options.modules, this._options.moduleMap)
-    );
+    logger.setLogLevel(this.config.logLevel);
+    authLogger.setLogLevel(this.config.logLevel);
+    clientLogger.setLogLevel(this.config.logLevel);
   }
 
+  get config() { return this._config; }
   get io() { return this._io; }
   get path() { return this._path; }
 
   async run() {
+    Object.values(this._config.paths).forEach((p) => fs.mkdirpSync(p));
+
     this._app = buildHttpApp();
     logger.info("Registering all bmodules with the server.");
 
     await Promise.all(Object.values(this._bmodules).map(async (bmodule) => {
+      fs.mkdirpSync(this.moduleStorePath(bmodule.name));
+
       const wrapper = new HttpWrapper(bmodule.name, this._app, this);
       await bmodule.register(this, wrapper);
 
@@ -81,8 +86,8 @@ export default class Server extends EventEmitter2 {
     this._configureSocketIO();
 
     this.emit("internal.beforeRun", this);
-    this._httpServer.listen(this._options.http.port, () => {
-      logger.info(`Web server listening on port ${this._options.http.port}.`);
+    this._httpServer.listen(this._config.http.port, () => {
+      logger.info(`Web server listening on port ${this._config.http.port}.`);
     });
   }
 
@@ -104,7 +109,7 @@ export default class Server extends EventEmitter2 {
   }
 
   async readModuleCache(bmName) {
-    const cachePath = this._moduleCachePath(bmName);
+    const cachePath = this.moduleStorePath(bmName, 'store.json');
     logger.debug(`Loading cache for '${bmName}' from '${cachePath}'.`);
 
     if (await fsp.exists(cachePath)) {
@@ -120,14 +125,15 @@ export default class Server extends EventEmitter2 {
     if (typeof moduleState !== 'object') {
       logger.warn(`Module '${bmName}' attempted to save a non-object cache. Probably a bug.`);
     } else {
-      const cachePath = this._moduleCachePath(bmName);
+      const cachePath = this.moduleStorePath(bmName, 'store.json');
       logger.trace(`Writing cache for '${bmName}' to '${cachePath}'.`);
       await fsp.writeFile(cachePath, JSON.stringify(moduleState));
     }
   }
 
-  _moduleCachePath(bmName) {
-    return `${this.path}/store/${bmName}.json`;
+  moduleStorePath(bmName, file) {
+    const basePath = path.join(this._config.paths.store, bmName);
+    return file ? path.join(basePath, file) : basePath;
   }
 
   /**
@@ -195,7 +201,7 @@ export default class Server extends EventEmitter2 {
       // down to both dashboards and frontends; however, there are so many messages that
       // don't really need server-side processing that can just be passed straight through,
       // so here's how we do that.
-      const automaticPushdowns = ((this._options || {}).automaticPushdowns || []);
+      const automaticPushdowns = this._config.automaticPushdowns;
       if (!eventName.startsWith("internal.") && automaticPushdowns.some((regex) => regex.test(eventName))) {
         logger.debug(`Automatic pushdown: ${eventName}`);
         this.pushEvent(eventName, event);
@@ -253,7 +259,7 @@ export default class Server extends EventEmitter2 {
         return false;
       }
 
-      const frontendAuth = this._options.frontendAuth;
+      const frontendAuth = this._config.auth.frontend;
 
       if (!frontendAuth) {
         trace("No frontendAuth config defined; assuming open auth.");
@@ -275,7 +281,7 @@ export default class Server extends EventEmitter2 {
 
       return passphraseMatches;
     } else if (clientType === 'management') {
-      const managementAuth = this._options.managementAuth;
+      const managementAuth = this._config.auth.management;
 
       if (!managementAuth) { return true; }
 

@@ -1,6 +1,6 @@
 {
   "name": "@bossmodecg/core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The core server runtime for BossmodeCG.",
   "main": "dist",
   "license": "MIT",
@@ -12,11 +12,11 @@
     "dist"
   ],
   "dependencies": {
-    "ajv": "^4.11.5",
     "babel-runtime": "^6.23.0",
     "commander": "^2.9.0",
     "eventemitter2": "^4.0.0",
     "express": "^4.15.2",
+    "fs-extra": "^2.1.2",
     "fs-promise": "^2.0.1",
     "jsondiffpatch": "^0.2.4",
     "lodash": "^4.17.4",
@@ -24,7 +24,8 @@
     "morgan": "^1.8.1",
     "node-async-locks": "^1.0.1",
     "socket.io": "^1.7.3",
-    "socket.io-client": "^1.7.3"
+    "socket.io-client": "^1.7.3",
+    "tmp": "^0.0.31"
   },
   "devDependencies": {
     "babel-cli": "^6.24.0",

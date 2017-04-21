@@ -8,14 +8,3 @@ export function funcify(obj) {
       return obj;
   }
 }
-
-export function messagify(obj) {
-  switch (typeof obj) {
-    case 'function':
-      return obj();
-    case 'object':
-      return JSON.stringify(obj);
-    default:
-      return obj;
-  }
-}

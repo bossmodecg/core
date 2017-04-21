@@ -1,10 +1,20 @@
 import moment from 'moment';
 
-import { messagify } from './util';
+function messagify(obj) {
+  switch (typeof obj) {
+    case 'function':
+      return obj();
+    case 'object':
+      return JSON.stringify(obj);
+    default:
+      return obj;
+  }
+}
 
 export class Logger {
   constructor(category) {
     this._category = (category || "unspecified").toLowerCase();
+    this.setLogLevel = this.setLogLevel.bind(this);
 
     this.error = this.error.bind(this);
     this.showError = true;
@@ -47,11 +57,17 @@ export class Logger {
       console.log(`T ${moment().toISOString()} [${this._category}] ${messagify(msg)}`);
     }
   }
-}
 
-export class ModuleLogger extends Logger {
-  constructor(category) {
-    super(`module-${category}`);
+  setLogLevel(logLevel) {
+    if (!logLevel) return;
+
+    const logValue = ['trace', 'debug', 'info', 'warn', 'error', 'off'].indexOf(logLevel);
+
+    this.showTrace = logValue < 1;
+    this.showDebug = logValue < 2;
+    this.showInfo = logValue < 3;
+    this.showWarn = logValue < 4;
+    this.showError = logValue < 5;
   }
 }
 
