@@ -1,4 +1,4 @@
-import { Logger } from '../logger';
+import Logger from '../logger';
 import { bossmodeCGHeaders } from './helpers';
 
 export default class HttpWrapper {
@@ -12,7 +12,7 @@ export default class HttpWrapper {
     this._app = app;
     this._server = server;
 
-    this._logger = new Logger(`http-${this._bmName}`);
+    this._logger = Logger.child({ component: `http-${this._bmName}` });
   }
 
   get(path, fn) {

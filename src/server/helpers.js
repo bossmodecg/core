@@ -2,9 +2,9 @@ import express from 'express';
 import morgan from 'morgan';
 import socketio from 'socket.io';
 
-import { Logger } from '../logger';
+import Logger from '../logger';
 
-const logger = new Logger("server");
+const logger = Logger.child({ component: "server" });
 
 export const bossmodeCGHeaders =
   Object.freeze({

@@ -7,7 +7,7 @@ import fsp from 'fs-promise';
 
 import { EventEmitter2 } from 'eventemitter2';
 
-import { Logger } from '../logger';
+import Logger from '../logger';
 import HttpWrapper from './http_wrapper';
 
 import defaultConfig from './default_config';
@@ -17,9 +17,9 @@ import {
   buildSocketIO
 } from './helpers';
 
-const logger = new Logger("server");
-const clientLogger = new Logger("client");
-const authLogger = new Logger("auth");
+const logger = Logger.child({ component: "server" });
+const clientLogger = Logger.child({ component: "client" });
+const authLogger = Logger.child({ component: "auth" });
 
 export default class Server extends EventEmitter2 {
   constructor(config, bmodules) {
@@ -50,9 +50,7 @@ export default class Server extends EventEmitter2 {
     this._config = Object.freeze(_.merge({}, defaultConfig, config));
     this._bmodules = _.mapKeys(bmodules, (bmodule) => bmodule.name);
 
-    logger.setLogLevel(this.config.logLevel);
-    authLogger.setLogLevel(this.config.logLevel);
-    clientLogger.setLogLevel(this.config.logLevel);
+    // TODO: work log levels into config/bunyan?
   }
 
   get config() { return this._config; }
