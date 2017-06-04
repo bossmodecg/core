@@ -67,7 +67,7 @@ export default class Server extends EventEmitter2 {
       fs.mkdirpSync(this.moduleStorePath(bmodule.name));
 
       const wrapper = new HttpWrapper(bmodule.name, this._app, this);
-      await bmodule.register(this, wrapper);
+      await bmodule.register(Logger, this, wrapper);
 
       bmodule.onAny((eventName, event) => {
         if (!eventName.startsWith("internal.")) {
